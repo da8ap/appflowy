@@ -1,0 +1,22 @@
+# Example override file for local development
+# Copy this to docker-compose.override.yml to customize for local use
+# This file is automatically loaded by docker-compose
+
+version: '3.8'
+
+services:
+  backend:
+    # Uncomment to mount local backend code for development
+    # volumes:
+    #   - ./backend:/app/backend:ro
+
+  frontend:
+    # Uncomment to mount local frontend code for development
+    # volumes:
+    #   - ./frontend:/app/frontend:ro
+
+  postgres:
+    # Uncomment to expose PostgreSQL port for local access
+    # ports:
+    #   - "5432:5432"
+

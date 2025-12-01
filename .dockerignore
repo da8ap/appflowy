@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Documentation
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Storage (user files)
+storage/*
+!storage/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+target/
+build/
+dist/
+node_modules/
+
