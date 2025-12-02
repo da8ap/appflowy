@@ -128,6 +128,7 @@ RUN python3 -c "from ruamel.yaml import YAML; y = YAML(); y.load(open('pubspec.y
 
 # Get Flutter dependencies - capture full error output (run as flutter user)
 USER flutter
+ENV HOME=/home/flutter
 RUN echo "=== RUNNING FLUTTER PUB GET ===" && \
     echo "Current directory: $(pwd)" && \
     echo "Flutter version: $(flutter --version | head -1)" && \
@@ -142,6 +143,7 @@ USER root
 # Build WASM components first (required before Flutter web build)
 # Rust/wasm-pack can run as flutter user
 USER flutter
+ENV HOME=/home/flutter
 WORKDIR /app/frontend
 RUN BASE_DIR=$(pwd) && \
     crates=("lib-dispatch" "lib-infra" "flowy-notification" "flowy-date" "flowy-error" "collab-integrate" "flowy-document") && \
