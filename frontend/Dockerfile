@@ -35,8 +35,7 @@ ENV PATH="/opt/flutter/bin:${PATH}"
 
 # Verify Flutter installation and enable web support
 RUN flutter --version && \
-    flutter config --enable-web && \
-    flutter doctor -v
+    flutter config --enable-web
 
 WORKDIR /app
 
