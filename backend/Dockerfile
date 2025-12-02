@@ -1,6 +1,5 @@
 # Simple Task Management Backend
-# Since AppFlowy doesn't have a separate backend, we'll create a simple REST API
-# This can be extended later for full task management features
+# Rust API server for task management
 
 FROM rust:1.75-slim as builder
 
@@ -14,40 +13,59 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Create a simple Rust backend for task management
-RUN cargo new --bin task_backend && \
-    cd task_backend && \
-    echo '[package]' > Cargo.toml && \
-    echo 'name = "task_backend"' >> Cargo.toml && \
-    echo 'version = "0.1.0"' >> Cargo.toml && \
-    echo 'edition = "2021"' >> Cargo.toml && \
-    echo '' >> Cargo.toml && \
-    echo '[dependencies]' >> Cargo.toml && \
-    echo 'tokio = { version = "1", features = ["full"] }' >> Cargo.toml && \
-    echo 'axum = "0.7"' >> Cargo.toml && \
-    echo 'serde = { version = "1.0", features = ["derive"] }' >> Cargo.toml && \
-    echo 'serde_json = "1.0"' >> Cargo.toml && \
-    echo 'sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }' >> Cargo.toml && \
-    echo 'tower = "0.4"' >> Cargo.toml && \
-    echo 'tower-http = { version = "0.5", features = ["cors"] }' >> Cargo.toml
-
-# Create a simple health check server
-RUN echo 'use axum::{routing::get, Router};' > task_backend/src/main.rs && \
-    echo 'use tower_http::cors::CorsLayer;' >> task_backend/src/main.rs && \
-    echo '' >> task_backend/src/main.rs && \
-    echo '#[tokio::main]' >> task_backend/src/main.rs && \
-    echo 'async fn main() {' >> task_backend/src/main.rs && \
-    echo '    let app = Router::new()' >> task_backend/src/main.rs && \
-    echo '        .route("/health", get(|| async { "OK" }))' >> task_backend/src/main.rs && \
-    echo '        .route("/api/health", get(|| async { r#"{"status":"ok"}"# }))' >> task_backend/src/main.rs && \
-    echo '        .layer(CorsLayer::permissive());' >> task_backend/src/main.rs && \
-    echo '' >> task_backend/src/main.rs && \
-    echo '    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000").await.unwrap();' >> task_backend/src/main.rs && \
-    echo '    println!("Server running on http://0.0.0.0:8000");' >> task_backend/src/main.rs && \
-    echo '    axum::serve(listener, app).await.unwrap();' >> task_backend/src/main.rs && \
-    echo '}' >> task_backend/src/main.rs
+# Create a simple Rust backend
+RUN cargo new --bin task_backend
 
 WORKDIR /app/task_backend
+
+# Create Cargo.toml with dependencies
+RUN cat > Cargo.toml << 'EOF'
+[package]
+name = "task_backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+EOF
+
+# Create main.rs with proper Rust code
+RUN cat > src/main.rs << 'EOF'
+use axum::{
+    routing::get,
+    Router,
+};
+use tower_http::cors::CorsLayer;
+
+#[tokio::main]
+async fn main() {
+    let app = Router::new()
+        .route("/health", get(health_handler))
+        .route("/api/health", get(api_health_handler))
+        .layer(CorsLayer::permissive());
+
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
+        .await
+        .expect("Failed to bind to address");
+    
+    println!("Server running on http://0.0.0.0:8000");
+    axum::serve(listener, app).await.unwrap();
+}
+
+async fn health_handler() -> &'static str {
+    "OK"
+}
+
+async fn api_health_handler() -> &'static str {
+    r#"{"status":"ok"}"#
+}
+EOF
 
 # Build the backend
 RUN cargo build --release
