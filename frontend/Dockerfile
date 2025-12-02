@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libglu1-mesa \
     build-essential \
     pkg-config \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust (required for WASM builds)
@@ -39,13 +40,36 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 
 WORKDIR /app/frontend/appflowy_flutter
 
-# Fix dependency conflict: override leak_tracker to compatible version
-# Update the version in pubspec.yaml to match Flutter SDK requirement
-RUN sed -i 's/leak_tracker: \^10\.0\.0/leak_tracker: ^11.0.1/g' pubspec.yaml && \
-    cat pubspec.yaml | grep leak_tracker || echo "leak_tracker not found"
+# Fix dependency conflict: remove leak_tracker from dependencies, add to dependency_overrides
+RUN python3 << 'PYTHON_SCRIPT'
+import re
 
-# Get Flutter dependencies - show verbose output to debug
-RUN flutter pub get --verbose 2>&1 | head -100 || (echo "=== PUB GET FAILED ===" && cat pubspec.yaml | grep -A 5 -B 5 leak_tracker && exit 1)
+with open('pubspec.yaml', 'r') as f:
+    content = f.read()
+
+# Remove leak_tracker from dependencies section
+content = re.sub(r'^\s+leak_tracker:\s+\^10\.0\.0\s*$', '', content, flags=re.MULTILINE)
+
+# Add leak_tracker to dependency_overrides if not already there
+if 'leak_tracker:' not in content or 'dependency_overrides' not in content.split('leak_tracker:')[0]:
+    # Find dependency_overrides section and add leak_tracker
+    if 'dependency_overrides:' in content:
+        content = re.sub(
+            r'(dependency_overrides:\s*\n)',
+            r'\1  leak_tracker: ^11.0.1\n',
+            content,
+            count=1
+        )
+    else:
+        # Add dependency_overrides section at the end
+        content += '\ndependency_overrides:\n  leak_tracker: ^11.0.1\n'
+
+with open('pubspec.yaml', 'w') as f:
+    f.write(content)
+PYTHON_SCRIPT
+
+# Get Flutter dependencies
+RUN flutter pub get
 
 # Build WASM components first (required before Flutter web build)
 WORKDIR /app/frontend
