@@ -50,12 +50,13 @@ RUN flutter pub get
 
 # Build WASM components first (required before Flutter web build)
 WORKDIR /app/frontend
-RUN crates=("lib-dispatch" "lib-infra" "flowy-notification" "flowy-date" "flowy-error" "collab-integrate" "flowy-document") && \
+RUN BASE_DIR=$(pwd) && \
+    crates=("lib-dispatch" "lib-infra" "flowy-notification" "flowy-date" "flowy-error" "collab-integrate" "flowy-document") && \
     for crate in "${crates[@]}"; do \
         echo "Building $crate with wasm-pack..." && \
-        cd rust-lib/$crate && \
+        cd "$BASE_DIR/rust-lib/$crate" || { echo "Failed to enter directory $crate"; exit 1; } && \
         wasm-pack build || { echo "Build failed for $crate"; exit 1; } && \
-        cd /app/frontend; \
+        cd "$BASE_DIR"; \
     done
 
 # Build Flutter web app
