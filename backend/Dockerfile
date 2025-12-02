@@ -1,7 +1,7 @@
 # Simple Task Management Backend
 # Rust API server for task management
 
-FROM rust:1.75-slim as builder
+FROM rust:1.82-slim as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -18,7 +18,7 @@ RUN cargo new --bin task_backend
 
 WORKDIR /app/task_backend
 
-# Create Cargo.toml with dependencies
+# Create Cargo.toml with dependencies (using older stable versions)
 RUN cat > Cargo.toml << 'EOF'
 [package]
 name = "task_backend"
@@ -26,16 +26,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-axum = "0.7"
+tokio = { version = "1.28", features = ["full"] }
+axum = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors"] }
+tower-http = { version = "0.4", features = ["cors"] }
 EOF
 
-# Create main.rs with proper Rust code
+# Create main.rs with proper Rust code (compatible with axum 0.6)
 RUN cat > src/main.rs << 'EOF'
 use axum::{
     routing::get,
@@ -50,12 +49,12 @@ async fn main() {
         .route("/api/health", get(api_health_handler))
         .layer(CorsLayer::permissive());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8000")
+    let addr = "0.0.0.0:8000".parse().unwrap();
+    println!("Server running on http://{}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
         .await
-        .expect("Failed to bind to address");
-    
-    println!("Server running on http://0.0.0.0:8000");
-    axum::serve(listener, app).await.unwrap();
+        .unwrap();
 }
 
 async fn health_handler() -> &'static str {
