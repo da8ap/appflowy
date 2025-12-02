@@ -125,7 +125,8 @@ RUN echo "=== AFTER MODIFICATION ===" && \
 RUN python3 -c "from ruamel.yaml import YAML; y = YAML(); y.load(open('pubspec.yaml'))" || \
     (echo "ERROR: pubspec.yaml is invalid YAML after modification!" && cat pubspec.yaml && exit 1)
 
-# Get Flutter dependencies - capture full error output
+# Get Flutter dependencies - capture full error output (run as flutter user)
+USER flutter
 RUN echo "=== RUNNING FLUTTER PUB GET ===" && \
     echo "Current directory: $(pwd)" && \
     echo "Flutter version: $(flutter --version | head -1)" && \
@@ -134,11 +135,12 @@ RUN echo "=== RUNNING FLUTTER PUB GET ===" && \
      cat /tmp/pub_get_output.log && \
      echo "=== PUBSPEC.YAML CONTENT ===" && \
      cat pubspec.yaml && \
-     echo "=== FLUTTER DOCTOR ===" && \
-     flutter doctor -v && \
      exit 1)
+USER root
 
 # Build WASM components first (required before Flutter web build)
+# Rust/wasm-pack can run as flutter user
+USER flutter
 WORKDIR /app/frontend
 RUN BASE_DIR=$(pwd) && \
     crates=("lib-dispatch" "lib-infra" "flowy-notification" "flowy-date" "flowy-error" "collab-integrate" "flowy-document") && \
