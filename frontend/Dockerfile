@@ -40,9 +40,8 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 WORKDIR /app/frontend/appflowy_flutter
 
 # Fix dependency conflict: override leak_tracker to compatible version
-# Remove leak_tracker from dependencies and add to dependency_overrides
-RUN sed -i '/^  leak_tracker:.*/d' pubspec.yaml && \
-    sed -i '/^dependency_overrides:/a\  leak_tracker: ^11.0.1' pubspec.yaml
+# Simply update the version in pubspec.yaml to match Flutter SDK requirement
+RUN sed -i 's/leak_tracker: \^10\.0\.0/leak_tracker: ^11.0.1/g' pubspec.yaml
 
 # Get Flutter dependencies
 RUN flutter pub get
