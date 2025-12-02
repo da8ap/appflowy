@@ -16,18 +16,57 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Clone AppFlowy repository (using stable tag for stability)
+# Try using a specific release tag for more stability
 ARG APPFLOWY_VERSION=main
-RUN git clone --depth 1 --branch ${APPFLOWY_VERSION} https://github.com/AppFlowy-IO/appflowy.git /tmp/appflowy
+RUN git clone --depth 1 --branch ${APPFLOWY_VERSION} https://github.com/AppFlowy-IO/appflowy.git /tmp/appflowy || \
+    (echo "Failed to clone main branch, trying latest tag" && \
+     git clone --depth 1 https://github.com/AppFlowy-IO/appflowy.git /tmp/appflowy)
 
-# Copy backend code
-RUN cp -r /tmp/appflowy/backend /app/backend
+# Debug: Check what's in the cloned repository
+RUN echo "=== AppFlowy repository structure ===" && \
+    ls -la /tmp/appflowy/ && \
+    echo "" && \
+    echo "=== Top-level directories ===" && \
+    find /tmp/appflowy -maxdepth 1 -type d | sort && \
+    echo "" && \
+    echo "=== Looking for backend/server/Cargo.toml ===" && \
+    find /tmp/appflowy -maxdepth 3 -name "Cargo.toml" -o -name "backend" -type d | head -10
+
+# Try to find and copy backend code (handle different possible structures)
+# AppFlowy might have backend in different locations
+RUN if [ -d "/tmp/appflowy/backend" ] && [ -f "/tmp/appflowy/backend/Cargo.toml" ]; then \
+        echo "Found backend directory with Cargo.toml" && \
+        cp -r /tmp/appflowy/backend /app/backend; \
+    elif [ -d "/tmp/appflowy/appflowy-backend" ] && [ -f "/tmp/appflowy/appflowy-backend/Cargo.toml" ]; then \
+        echo "Found appflowy-backend directory" && \
+        cp -r /tmp/appflowy/appflowy-backend /app/backend; \
+    elif [ -d "/tmp/appflowy/server" ] && [ -f "/tmp/appflowy/server/Cargo.toml" ]; then \
+        echo "Found server directory" && \
+        cp -r /tmp/appflowy/server /app/backend; \
+    elif [ -f "/tmp/appflowy/Cargo.toml" ]; then \
+        echo "Found Cargo.toml at root, using entire repository as backend" && \
+        cp -r /tmp/appflowy /app/backend; \
+    else \
+        echo "ERROR: Could not find backend with Cargo.toml. Full structure:" && \
+        find /tmp/appflowy -type f -name "Cargo.toml" && \
+        find /tmp/appflowy -maxdepth 2 -type d && \
+        exit 1; \
+    fi
 
 WORKDIR /app/backend
 
-# Build the backend
-# Note: Adjust build command based on actual AppFlowy backend structure
-RUN cargo build --release || \
-    (echo "Build failed, checking structure..." && ls -la && exit 1)
+# Check if Cargo.toml exists and show structure
+RUN echo "=== Backend structure ===" && \
+    ls -la && \
+    if [ -f "Cargo.toml" ]; then \
+        echo "Found Cargo.toml, building..." && \
+        cargo build --release; \
+    else \
+        echo "ERROR: Cargo.toml not found. Contents:" && \
+        find . -name "Cargo.toml" && \
+        ls -la && \
+        exit 1; \
+    fi
 
 # Runtime stage
 FROM debian:bookworm-slim
