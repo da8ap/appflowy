@@ -38,8 +38,9 @@ ENV PATH="/opt/flutter/bin:${PATH}"
 RUN useradd -m -s /bin/bash flutter && \
     chown -R flutter:flutter /opt/flutter
 
-# Enable web support as non-root user
+# Enable web support as non-root user (set HOME explicitly)
 USER flutter
+ENV HOME=/home/flutter
 RUN flutter config --enable-web
 USER root
 
