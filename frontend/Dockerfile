@@ -54,7 +54,7 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend && \
     chown -R flutter:flutter /app/frontend
 
 WORKDIR /app/frontend/appflowy_flutter
-USER flutter
+USER root
 
 # Verify pubspec.yaml exists
 RUN test -f pubspec.yaml || (echo "ERROR: pubspec.yaml not found!" && ls -la && exit 1)
