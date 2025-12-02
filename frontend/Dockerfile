@@ -42,7 +42,7 @@ WORKDIR /app/frontend/appflowy_flutter
 # Fix dependency conflict: override leak_tracker to compatible version
 # AppFlowy already has dependency_overrides, append to it
 RUN if ! grep -q "leak_tracker:" pubspec.yaml; then \
-        sed -i '/^dependency_overrides:/a \  leak_tracker: ^11.0.1' pubspec.yaml; \
+        sed -i '/^dependency_overrides:/a\\  leak_tracker: ^11.0.1' pubspec.yaml; \
     fi
 
 # Get Flutter dependencies
