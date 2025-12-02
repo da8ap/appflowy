@@ -15,7 +15,11 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     pkg-config \
     python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Install PyYAML for proper YAML parsing
+RUN pip3 install --no-cache-dir pyyaml
 
 # Install Rust (required for WASM builds)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -47,52 +51,39 @@ RUN echo "=== BEFORE MODIFICATION ===" && \
     grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
 
 # Fix dependency conflict: remove leak_tracker from dependencies, add to dependency_overrides
+# Use proper YAML parsing for reliable modification
 RUN python3 << 'PYTHON_SCRIPT'
-import re
+import yaml
 import sys
 
 try:
     print("=== PYTHON SCRIPT STARTING ===")
     
+    # Read pubspec.yaml
     with open('pubspec.yaml', 'r') as f:
-        content = f.read()
+        data = yaml.safe_load(f)
     
-    original_content = content
-    print(f"Read pubspec.yaml: {len(content)} characters")
+    print(f"Loaded pubspec.yaml successfully")
     
-    # Remove leak_tracker from dependencies section
-    before_remove = content
-    content = re.sub(r'^\s+leak_tracker:\s+\^10\.0\.0\s*$', '', content, flags=re.MULTILINE)
-    if before_remove != content:
+    # Remove leak_tracker from dependencies if it exists
+    if 'dependencies' in data and 'leak_tracker' in data['dependencies']:
+        del data['dependencies']['leak_tracker']
         print("SUCCESS: Removed leak_tracker from dependencies")
     else:
-        print("WARNING: leak_tracker not found in dependencies (might already be removed)")
+        print("INFO: leak_tracker not found in dependencies")
     
-    # Add leak_tracker to dependency_overrides if not already there
-    if 'leak_tracker: ^11.0.1' not in content:
-        if 'dependency_overrides:' in content:
-            # Find dependency_overrides section and add leak_tracker
-            content = re.sub(
-                r'(dependency_overrides:\s*\n)',
-                r'\1  leak_tracker: ^11.0.1\n',
-                content,
-                count=1
-            )
-            print("SUCCESS: Added leak_tracker to existing dependency_overrides")
-        else:
-            # Add dependency_overrides section at the end
-            content += '\ndependency_overrides:\n  leak_tracker: ^11.0.1\n'
-            print("SUCCESS: Created dependency_overrides section with leak_tracker")
-    else:
-        print("INFO: leak_tracker override already exists")
+    # Ensure dependency_overrides exists
+    if 'dependency_overrides' not in data:
+        data['dependency_overrides'] = {}
+        print("Created dependency_overrides section")
     
+    # Add leak_tracker to dependency_overrides
+    data['dependency_overrides']['leak_tracker'] = '^11.0.1'
+    print("SUCCESS: Added leak_tracker: ^11.0.1 to dependency_overrides")
+    
+    # Write back to file
     with open('pubspec.yaml', 'w') as f:
-        f.write(content)
-    
-    # Verify the change was made
-    if original_content == content:
-        print("ERROR: pubspec.yaml was not modified!")
-        sys.exit(1)
+        yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
     
     print("=== PYTHON SCRIPT COMPLETED SUCCESSFULLY ===")
     
