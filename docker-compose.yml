@@ -1,15 +1,52 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: task-postgres
+    environment:
+      POSTGRES_DB: taskmanager
+      POSTGRES_USER: taskuser
+      POSTGRES_PASSWORD: taskpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: task-backend
+    environment:
+      - DATABASE_URL=postgres://taskuser:taskpass@postgres:5432/taskmanager
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: task-manager-frontend
-    ports:
-      - "6633:80"
+    container_name: task-frontend
     restart: unless-stopped
 
-volumes: {}
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: task-nginx
+    ports:
+      - "6633:6633"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
 
-networks: {}
+volumes:
+  postgres_data:
