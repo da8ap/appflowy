@@ -40,11 +40,12 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 WORKDIR /app/frontend/appflowy_flutter
 
 # Fix dependency conflict: override leak_tracker to compatible version
-# Simply update the version in pubspec.yaml to match Flutter SDK requirement
-RUN sed -i 's/leak_tracker: \^10\.0\.0/leak_tracker: ^11.0.1/g' pubspec.yaml
+# Update the version in pubspec.yaml to match Flutter SDK requirement
+RUN sed -i 's/leak_tracker: \^10\.0\.0/leak_tracker: ^11.0.1/g' pubspec.yaml && \
+    cat pubspec.yaml | grep leak_tracker || echo "leak_tracker not found"
 
-# Get Flutter dependencies
-RUN flutter pub get
+# Get Flutter dependencies - show verbose output to debug
+RUN flutter pub get --verbose 2>&1 | head -100 || (echo "=== PUB GET FAILED ===" && cat pubspec.yaml | grep -A 5 -B 5 leak_tracker && exit 1)
 
 # Build WASM components first (required before Flutter web build)
 WORKDIR /app/frontend
