@@ -33,8 +33,8 @@ WORKDIR /opt
 RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ
 ENV PATH="/opt/flutter/bin:${PATH}"
 
-# Initialize Flutter and enable web support
-RUN flutter config --enable-web
+# Enable web support (Flutter will auto-initialize on first run)
+RUN /opt/flutter/bin/flutter config --enable-web
 
 WORKDIR /app
 
