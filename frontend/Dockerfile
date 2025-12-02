@@ -1,7 +1,23 @@
 # AppFlowy Frontend Dockerfile
 # Builds AppFlowy Flutter web app
+# Uses Flutter 3.27.4 as required by AppFlowy
 
-FROM ghcr.io/cirruslabs/flutter:stable as builder
+FROM ubuntu:22.04 AS builder
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    unzip \
+    xz-utils \
+    zip \
+    libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Flutter 3.27.4 (specific version required by AppFlowy)
+WORKDIR /opt
+RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ
+ENV PATH="/opt/flutter/bin:${PATH}"
 
 WORKDIR /app
 
@@ -9,27 +25,27 @@ WORKDIR /app
 ARG APPFLOWY_VERSION=main
 RUN git clone --depth 1 --branch ${APPFLOWY_VERSION} https://github.com/AppFlowy-IO/appflowy.git /tmp/appflowy
 
-# The frontend is in frontend/appflowy_flutter
-RUN if [ -d "/tmp/appflowy/frontend/appflowy_flutter" ]; then \
-        echo "Found AppFlowy Flutter app" && \
-        cp -r /tmp/appflowy/frontend/appflowy_flutter /app/appflowy_flutter; \
-    else \
-        echo "ERROR: Could not find frontend/appflowy_flutter" && \
-        ls -la /tmp/appflowy/frontend/ && \
-        exit 1; \
-    fi
+# Copy frontend directory (need the whole frontend for build tools)
+RUN cp -r /tmp/appflowy/frontend /app/frontend
 
-WORKDIR /app/appflowy_flutter
+WORKDIR /app/frontend/appflowy_flutter
+
+# Fix dependency conflict: override leak_tracker to compatible version
+RUN echo "" >> pubspec.yaml && \
+    echo "dependency_overrides:" >> pubspec.yaml && \
+    echo "  leak_tracker: ^11.0.1" >> pubspec.yaml
+
+# Get Flutter dependencies (ignore test dependencies for production build)
+RUN flutter pub get --no-example
 
 # Build Flutter web app
-RUN flutter pub get && \
-    flutter build web --release
+RUN flutter build web --release
 
 # Runtime stage
 FROM nginx:alpine
 
 # Copy built files
-COPY --from=builder /app/appflowy_flutter/build/web /usr/share/nginx/html
+COPY --from=builder /app/frontend/appflowy_flutter/build/web /usr/share/nginx/html
 
 # Copy nginx configuration for frontend
 COPY nginx.conf /etc/nginx/conf.d/default.conf
