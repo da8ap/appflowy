@@ -31,12 +31,13 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 WORKDIR /app/frontend/appflowy_flutter
 
 # Fix dependency conflict: override leak_tracker to compatible version
-RUN echo "" >> pubspec.yaml && \
-    echo "dependency_overrides:" >> pubspec.yaml && \
-    echo "  leak_tracker: ^11.0.1" >> pubspec.yaml
+# AppFlowy already has dependency_overrides, append to it
+RUN if ! grep -q "leak_tracker:" pubspec.yaml; then \
+        sed -i '/^dependency_overrides:/a\  leak_tracker: ^11.0.1' pubspec.yaml; \
+    fi
 
-# Get Flutter dependencies (ignore test dependencies for production build)
-RUN flutter pub get --no-example
+# Get Flutter dependencies
+RUN flutter pub get
 
 # Build Flutter web app
 RUN flutter build web --release
