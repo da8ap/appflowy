@@ -33,10 +33,9 @@ WORKDIR /opt
 RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ
 ENV PATH="/opt/flutter/bin:${PATH}"
 
-# Verify Flutter installation, accept licenses, and enable web support
+# Verify Flutter installation and enable web support
 RUN flutter --version && \
     flutter config --enable-web && \
-    yes | flutter doctor --android-licenses || true && \
     flutter doctor -v
 
 WORKDIR /app
