@@ -50,9 +50,11 @@ ARG APPFLOWY_VERSION=main
 RUN git clone --depth 1 --branch ${APPFLOWY_VERSION} https://github.com/AppFlowy-IO/appflowy.git /tmp/appflowy
 
 # Copy frontend directory (need the whole frontend for build tools)
-RUN cp -r /tmp/appflowy/frontend /app/frontend
+RUN cp -r /tmp/appflowy/frontend /app/frontend && \
+    chown -R flutter:flutter /app/frontend
 
 WORKDIR /app/frontend/appflowy_flutter
+USER flutter
 
 # Verify pubspec.yaml exists
 RUN test -f pubspec.yaml || (echo "ERROR: pubspec.yaml not found!" && ls -la && exit 1)
@@ -150,6 +152,9 @@ RUN BASE_DIR=$(pwd) && \
 # Build Flutter web app
 WORKDIR /app/frontend/appflowy_flutter
 RUN flutter build web --release
+
+# Switch back to root for copying files
+USER root
 
 # Runtime stage
 FROM nginx:alpine
