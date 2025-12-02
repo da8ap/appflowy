@@ -30,11 +30,18 @@ RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 # Install Flutter 3.27.4 (specific version required by AppFlowy)
 WORKDIR /opt
-RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ
+RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ && \
+    chmod -R 755 /opt/flutter
 ENV PATH="/opt/flutter/bin:${PATH}"
 
-# Enable web support (Flutter will auto-initialize on first run)
-RUN /opt/flutter/bin/flutter config --enable-web
+# Create non-root user (Flutter discourages running as root)
+RUN useradd -m -s /bin/bash flutter && \
+    chown -R flutter:flutter /opt/flutter
+
+# Enable web support as non-root user
+USER flutter
+RUN flutter config --enable-web
+USER root
 
 WORKDIR /app
 
