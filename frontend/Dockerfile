@@ -33,6 +33,11 @@ WORKDIR /opt
 RUN curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.27.4-stable.tar.xz | tar xJ
 ENV PATH="/opt/flutter/bin:${PATH}"
 
+# Verify Flutter installation and enable web support
+RUN flutter --version && \
+    flutter config --enable-web && \
+    flutter doctor -v
+
 WORKDIR /app
 
 # Clone AppFlowy repository
@@ -44,8 +49,13 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 
 WORKDIR /app/frontend/appflowy_flutter
 
+# Verify pubspec.yaml exists
+RUN test -f pubspec.yaml || (echo "ERROR: pubspec.yaml not found!" && ls -la && exit 1)
+
 # DEBUG: Show pubspec.yaml before modification
 RUN echo "=== BEFORE MODIFICATION ===" && \
+    echo "Current directory: $(pwd)" && \
+    echo "pubspec.yaml exists: $(test -f pubspec.yaml && echo 'YES' || echo 'NO')" && \
     grep -A 2 -B 2 "leak_tracker" pubspec.yaml || echo "leak_tracker not found" && \
     echo "=== dependency_overrides section ===" && \
     grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
@@ -104,13 +114,21 @@ RUN echo "=== AFTER MODIFICATION ===" && \
     echo "=== dependency_overrides section ===" && \
     grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
 
+# Verify pubspec.yaml is valid YAML after modification
+RUN python3 -c "from ruamel.yaml import YAML; y = YAML(); y.load(open('pubspec.yaml'))" || \
+    (echo "ERROR: pubspec.yaml is invalid YAML after modification!" && cat pubspec.yaml && exit 1)
+
 # Get Flutter dependencies - capture full error output
 RUN echo "=== RUNNING FLUTTER PUB GET ===" && \
+    echo "Current directory: $(pwd)" && \
+    echo "Flutter version: $(flutter --version | head -1)" && \
     flutter pub get 2>&1 | tee /tmp/pub_get_output.log || \
     (echo "=== FLUTTER PUB GET FAILED ===" && \
      cat /tmp/pub_get_output.log && \
      echo "=== PUBSPEC.YAML CONTENT ===" && \
      cat pubspec.yaml && \
+     echo "=== FLUTTER DOCTOR ===" && \
+     flutter doctor -v && \
      exit 1)
 
 # Build WASM components first (required before Flutter web build)
