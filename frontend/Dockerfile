@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PyYAML for proper YAML parsing
-RUN pip3 install --no-cache-dir pyyaml
+# Install ruamel.yaml for YAML parsing that preserves formatting
+RUN pip3 install --no-cache-dir ruamel.yaml
 
 # Install Rust (required for WASM builds)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -51,19 +51,23 @@ RUN echo "=== BEFORE MODIFICATION ===" && \
     grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
 
 # Fix dependency conflict: remove leak_tracker from dependencies, add to dependency_overrides
-# Use proper YAML parsing for reliable modification
+# Use ruamel.yaml to preserve original formatting
 RUN python3 << 'PYTHON_SCRIPT'
-import yaml
+from ruamel.yaml import YAML
 import sys
 
 try:
     print("=== PYTHON SCRIPT STARTING ===")
     
-    # Read pubspec.yaml
-    with open('pubspec.yaml', 'r') as f:
-        data = yaml.safe_load(f)
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    yaml.width = 4096
     
-    print(f"Loaded pubspec.yaml successfully")
+    # Read pubspec.yaml preserving formatting
+    with open('pubspec.yaml', 'r') as f:
+        data = yaml.load(f)
+    
+    print("Loaded pubspec.yaml successfully")
     
     # Remove leak_tracker from dependencies if it exists
     if 'dependencies' in data and 'leak_tracker' in data['dependencies']:
@@ -81,9 +85,9 @@ try:
     data['dependency_overrides']['leak_tracker'] = '^11.0.1'
     print("SUCCESS: Added leak_tracker: ^11.0.1 to dependency_overrides")
     
-    # Write back to file
+    # Write back preserving formatting
     with open('pubspec.yaml', 'w') as f:
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        yaml.dump(data, f)
     
     print("=== PYTHON SCRIPT COMPLETED SUCCESSFULLY ===")
     
