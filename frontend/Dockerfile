@@ -40,36 +40,83 @@ RUN cp -r /tmp/appflowy/frontend /app/frontend
 
 WORKDIR /app/frontend/appflowy_flutter
 
+# DEBUG: Show pubspec.yaml before modification
+RUN echo "=== BEFORE MODIFICATION ===" && \
+    grep -A 2 -B 2 "leak_tracker" pubspec.yaml || echo "leak_tracker not found" && \
+    echo "=== dependency_overrides section ===" && \
+    grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
+
 # Fix dependency conflict: remove leak_tracker from dependencies, add to dependency_overrides
 RUN python3 << 'PYTHON_SCRIPT'
 import re
+import sys
 
-with open('pubspec.yaml', 'r') as f:
-    content = f.read()
-
-# Remove leak_tracker from dependencies section
-content = re.sub(r'^\s+leak_tracker:\s+\^10\.0\.0\s*$', '', content, flags=re.MULTILINE)
-
-# Add leak_tracker to dependency_overrides if not already there
-if 'leak_tracker:' not in content or 'dependency_overrides' not in content.split('leak_tracker:')[0]:
-    # Find dependency_overrides section and add leak_tracker
-    if 'dependency_overrides:' in content:
-        content = re.sub(
-            r'(dependency_overrides:\s*\n)',
-            r'\1  leak_tracker: ^11.0.1\n',
-            content,
-            count=1
-        )
+try:
+    print("=== PYTHON SCRIPT STARTING ===")
+    
+    with open('pubspec.yaml', 'r') as f:
+        content = f.read()
+    
+    original_content = content
+    print(f"Read pubspec.yaml: {len(content)} characters")
+    
+    # Remove leak_tracker from dependencies section
+    before_remove = content
+    content = re.sub(r'^\s+leak_tracker:\s+\^10\.0\.0\s*$', '', content, flags=re.MULTILINE)
+    if before_remove != content:
+        print("SUCCESS: Removed leak_tracker from dependencies")
     else:
-        # Add dependency_overrides section at the end
-        content += '\ndependency_overrides:\n  leak_tracker: ^11.0.1\n'
-
-with open('pubspec.yaml', 'w') as f:
-    f.write(content)
+        print("WARNING: leak_tracker not found in dependencies (might already be removed)")
+    
+    # Add leak_tracker to dependency_overrides if not already there
+    if 'leak_tracker: ^11.0.1' not in content:
+        if 'dependency_overrides:' in content:
+            # Find dependency_overrides section and add leak_tracker
+            content = re.sub(
+                r'(dependency_overrides:\s*\n)',
+                r'\1  leak_tracker: ^11.0.1\n',
+                content,
+                count=1
+            )
+            print("SUCCESS: Added leak_tracker to existing dependency_overrides")
+        else:
+            # Add dependency_overrides section at the end
+            content += '\ndependency_overrides:\n  leak_tracker: ^11.0.1\n'
+            print("SUCCESS: Created dependency_overrides section with leak_tracker")
+    else:
+        print("INFO: leak_tracker override already exists")
+    
+    with open('pubspec.yaml', 'w') as f:
+        f.write(content)
+    
+    # Verify the change was made
+    if original_content == content:
+        print("ERROR: pubspec.yaml was not modified!")
+        sys.exit(1)
+    
+    print("=== PYTHON SCRIPT COMPLETED SUCCESSFULLY ===")
+    
+except Exception as e:
+    print(f"ERROR: Python script failed: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 PYTHON_SCRIPT
 
-# Get Flutter dependencies
-RUN flutter pub get
+# DEBUG: Show pubspec.yaml after modification
+RUN echo "=== AFTER MODIFICATION ===" && \
+    grep -A 2 -B 2 "leak_tracker" pubspec.yaml || echo "leak_tracker not found" && \
+    echo "=== dependency_overrides section ===" && \
+    grep -A 10 "dependency_overrides:" pubspec.yaml || echo "dependency_overrides not found"
+
+# Get Flutter dependencies - capture full error output
+RUN echo "=== RUNNING FLUTTER PUB GET ===" && \
+    flutter pub get 2>&1 | tee /tmp/pub_get_output.log || \
+    (echo "=== FLUTTER PUB GET FAILED ===" && \
+     cat /tmp/pub_get_output.log && \
+     echo "=== PUBSPEC.YAML CONTENT ===" && \
+     cat pubspec.yaml && \
+     exit 1)
 
 # Build WASM components first (required before Flutter web build)
 WORKDIR /app/frontend
